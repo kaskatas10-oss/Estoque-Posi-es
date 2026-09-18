@@ -1,0 +1,51 @@
+name: Publicar painel no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar painel e configuração Firebase
+        env:
+          FIREBASE_CONFIG_JSON: ${{ vars.FIREBASE_CONFIG_JSON }}
+        run: |
+          mkdir -p dist
+          cp public/index.html dist/index.html
+          touch dist/.nojekyll
+          if [ -n "$FIREBASE_CONFIG_JSON" ]; then
+            python3 scripts/injetar_config_firebase.py dist/index.html "$FIREBASE_CONFIG_JSON"
+          else
+            echo "FIREBASE_CONFIG_JSON não definida: o painel será publicado em modo local."
+          fi
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4
+
